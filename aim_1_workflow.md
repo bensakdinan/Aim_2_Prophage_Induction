@@ -9,6 +9,8 @@ The dataset I am working with is a previously established dataset from our lab. 
 ## Metagenome Assembly
 
 Short reads were assembled using MEGAHIT. 
+https://github.com/voutcn/megahit
+
 ```bash
 #!/bin/bash
 #SBATCH --time=1-00:00:00
@@ -50,6 +52,10 @@ seqkit seq -m 1000 -g /home/bens/projects/ctb-shapiro/bens/prophage_induction/re
 
 ### GeNomad 
 GeNomad is a tool to identify viral contigs. An functionality of this tool also identifies prophage contigs. 
+https://github.com/apcamargo/genomad
+
+GeNomad outputs can be found at `/home/bens/projects/ctb-shapiro/bens/prophage_induction/03_genomad`
+Prophage data can be found at `./${Sample}/final.contigs_find_proviruses`
 ```bash
 #!/bin/sh
 #SBATCH --mail-user=ben.sakdinan@mail.mcgill.ca
@@ -95,5 +101,143 @@ genomad end-to-end  --cleanup --splits 8 --enable-score-calibration $metagenomes
 deactivate
 ```
 
+#### Prophage Coordinates
+A later tool in my bioinformatic pipeline, PropagAtE, requires a prophage coordinates file. This is a .tsv file that contains the scaffold name that contains the prophage, the name of the specific propahge fragment name, the start nucleotide, and the stop nucleotide. GeNomad has this information within a larger file named final.contigs_provirus.tsv, but PropagAtE needs a .tsv file with only these data. To make this file, the code below was used:
+```bash
+#!/bin/sh
+#SBATCH --mail-user=ben.sakdinan@mail.mcgill.ca
+#SBATCH --mail-type=ALL
+#SBATCH --job-name=prophage_coordinates
+#SBATCH --output=%x-%j.out
+#SBATCH --time=1:00
+#SBATCH -o prophage_coordinates.o%j
+#SBATCH --array=1-345
+
+# sbatch --account=ctb-shapiro prophage_coordinates.sh
 
 
+prophage=$(cat /home/bens/projects/ctb-shapiro/bens/aline_data_07_02_24/01_data/samples.txt | awk -v SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID} 'NR==SLURM_ARRAY_TASK_ID') 
+genomad_output_dir=/home/bens/projects/ctb-shapiro/bens/prophage_induction/03_genomad
+echo $prophage
+
+prophage_dir=$genomad_output_dir/$prophage/final.contigs_find_proviruses
+file=$prophage_dir/final.contigs_provirus.tsv
+
+cd $prophage_dir
+if [ -f "${prophage}_prophage_coordinates.tsv" ]; then
+    rm ${prophage}_prophage_coordinates.tsv
+fi 
+
+# Prophage coordinates for MEGAHIT assemblies
+# I need to write code that will need to go to 01_megahit folder and get the name of the entire header line AND THEN assign it to a variable, VARIABLE_OF_HEADER, which will be awk printed in the below block of code
+if [ -f "$file" ]; then 
+    echo -e "scaffold\tfragment\tstart\tstop" > ${prophage}_prophage_coordinates.tsv
+
+    metagenome=/home/bens/projects/ctb-shapiro/bens/prophage_induction/01_rerun_megahit_output_alinedata_01.10/${prophage}/final.contigs.fa
+
+    awk 'NR > 1 {print $2}' "$file" | while read -r contig; do
+        scaffold_header=$(grep -m 1 "$contig" "$metagenome" | sed 's/^>//')
+
+        awk -v header="$scaffold_header" -v contig="$contig" 'NR > 1 && $2 == contig {
+            print header "\t" $1 "\t" $3 "\t" $4
+        }' "$file" >> ${prophage}_prophage_coordinates.tsv
+    done
+fi
+
+```
+
+### VIBRANT
+VIBRANT is another viral contig identification tool. 
+https://github.com/AnantharamanLab/VIBRANT 
+
+This tool was run by a colleague in the lab, Dr. Anshul Sinha, the output can be found at `/home/bens/projects/ctb-shapiro/bens/prophage_induction/03_vibrant/vibrant_output`
+
+## Detection of Prophage Induction - PropagAtE
+PropagAtE is a tool to identify actively replicating prophages. Propagate compares the depth of prophage reads to entire host region reads to classify a phage as active or inactive at a certain read depth ratio. These thresholds can be manually changed by the user.
+https://github.com/AnantharamanLab/PropagAtE
+
+Depending on whether GeNomad or VIBRANT was used, a slightly different PropagAtE script must be used. I ran PropagAtE at different a conservative (default) threshold and liberal threshold by adjusting these flags `-e 0.60 -c 1.50`
+
+GeNomad conservative threshold output: `/home/bens/projects/ctb-shapiro/bens/prophage_induction/04_propagate`
+GeNomad liberal threshold output: `/home/bens/projects/ctb-shapiro/bens/prophage_induction/04_propagate_0.60+1.50_threshold`
+VIBRANT default threshold output: `/home/bens/projects/ctb-shapiro/bens/prophage_induction/04_propagate_with_VIBRANT`
+
+For GeNomad:
+```bash
+#!/bin/sh
+#SBATCH --mail-user=ben.sakdinan@mail.mcgill.ca
+#SBATCH --mail-type=ALL
+#SBATCH --job-name=propagate_no_VIBRANT
+#SBATCH --output=%x-%j.out
+#SBATCH --time=5:00:00
+#SBATCH --tasks=6
+#SBATCH --mem=100G
+#SBATCH -o propagate_no_VIBRANT.o%j
+#SBATCH --array=1-6
+
+# sbatch --account=ctb-shapiro propagate_no_VIBRANT.sh
+
+# Modules
+module load StdEnv/2020
+module load bowtie2 samtools
+module load python
+
+# SLURM array assignment
+genomad_output_dir=/home/bens/projects/ctb-shapiro/bens/prophage_induction/03_genomad
+prophage=$(cat /home/bens/projects/ctb-shapiro/bens/scripts/misc_files/propagate_reruns.txt | awk -v SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID} 'NR==SLURM_ARRAY_TASK_ID') 
+echo $prophage
+
+# Prophage output directory from geNomad
+prophage_dir=$genomad_output_dir/$prophage/final.contigs_find_proviruses
+
+# Assigning Propagate input fields. 
+scaffold=/home/bens/projects/ctb-shapiro/bens/prophage_induction/01_rerun_megahit_output_alinedata_01.10/${prophage}/final.contigs.fa
+prophage_coordinates=$prophage_dir/${prophage}_prophage_coordinates.tsv
+reads=/home/bens/projects/ctb-shapiro/bens/aline_data_07_02_24/01_data/01_reads/${prophage}-QUALITY_PASSED
+
+# Run Propagate
+Propagate -f $scaffold -v $prophage_coordinates -r ${reads}_R1.fastq ${reads}_R2.fastq -e 0.60 -c 1.50 -t 12 -o /home/bens/projects/ctb-shapiro/bens/prophage_induction/04_propagate_0.60+1.50_threshold/$prophage --clean
+
+echo "Propagate done"
+```
+
+For VIBRANT:
+```bash
+#!/bin/sh
+#SBATCH --mail-user=ben.sakdinan@mail.mcgill.ca
+#SBATCH --mail-type=ALL
+#SBATCH --job-name=propagate_with_VIBRANT
+#SBATCH --output=%x-%j.out
+#SBATCH --time=5:00:00
+#SBATCH --tasks=6
+#SBATCH --mem=100G
+#SBATCH -o propagate_with_VIBRANT.o%j
+#SBATCH --array=1-344
+
+# sbatch --account=ctb-shapiro propagate_with_VIBRANT.sh
+
+# Modules
+module load StdEnv/2020
+module load bowtie2 samtools
+module load python
+
+# SLURM array assignment
+vibrant_output_dir=/home/bens/projects/ctb-shapiro/bens/prophage_induction/03_vibrant/vibrant_output
+prophage=$(cat /home/bens/projects/ctb-shapiro/bens/aline_data_07_02_24/01_data/samples.txt | awk -v SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID} 'NR==SLURM_ARRAY_TASK_ID') 
+echo $prophage
+
+# Assigning Propagate input fields. 
+scaffold=/home/bens/projects/ctb-shapiro/bens/prophage_induction/01_rerun_megahit_output_alinedata_01.10/${prophage}/final.contigs.fa
+prophage_coordinates=$vibrant_output_dir/$prophage/VIBRANT_1kb_final.contigs/VIBRANT_results_1kb_final.contigs/VIBRANT_integrated_prophage_coordinates_1kb_final.contigs.tsv
+reads=/home/bens/projects/ctb-shapiro/bens/aline_data_07_02_24/01_data/01_reads/${prophage}-QUALITY_PASSED
+
+# Run Propagate
+
+# Strict threshold
+Propagate -f $scaffold -v $prophage_coordinates -r ${reads}_R1.fastq ${reads}_R2.fastq -t 12 -o /home/bens/projects/ctb-shapiro/bens/prophage_induction/04_propagate_with_VIBRANT/$prophage --clean
+
+# Loose threshold
+#Propagate -f $scaffold -v $prophage_coordinates -r ${reads}_R1.fastq ${reads}_R2.fastq -e 0.60 -c 1.50 -t 12 -o /home/bens/projects/ctb-shapiro/bens/prophage_induction/04_propagate_0.60+1.50_threshold/$prophage --clean
+
+echo "Propagate done"
+```
