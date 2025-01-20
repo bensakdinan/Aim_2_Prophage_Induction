@@ -270,3 +270,37 @@ cd /home/bens/projects/ctb-shapiro/bens/prophage_induction/05_analysis
 
 awk -v metagenome="${metagenome}" 'BEGIN { OFS="\t" } NR > 1 { print metagenome, $8 }' "/home/bens/projects/ctb-shapiro/bens/prophage_induction/04_propagate/${metagenome}/${metagenome}.tsv" >> prophage-host_ratios.tsv
 ```
+
+## VContact2: Clustering by proteins
+
+#### Making gene-to-genome mapping file
+```bash
+output_csv="test_g2g_vcontact.csv"
+
+# Write the header row to the output file
+echo "protein_id,contig_id,keywords" > "$output_csv"
+
+# Loop through each sample directory
+for sample_dir in ./*/; do
+    # Extract the sample name from the directory path
+    sample_name=$(basename "$sample_dir")
+
+    # Path to the target .tsv file
+    genes_file="${sample_dir}final.contigs_find_proviruses/final.contigs_provirus_genes.tsv"
+
+    # Check if the file exists before processing
+    if [[ -f "$genes_file" ]]; then
+        echo "Processing $genes_file..."
+
+        # Extract the required columns and append to the output file
+        awk -F'\t' -v sample="$sample_name" 'NR > 1 { 
+            protein_id = sample "_" $1;  # Full protein ID with sample name
+            contig_id = $1;  # Original contig information from the "gene" column
+            keywords = $20;  # Annotation description
+            print protein_id "," contig_id "," keywords 
+        }' "$genes_file" >> "$output_csv"
+    else
+        echo "Warning: File not found in $genes_file"
+    fi
+done
+```
