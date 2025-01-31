@@ -275,9 +275,9 @@ awk -v metagenome="${metagenome}" 'BEGIN { OFS="\t" } NR > 1 { print metagenome,
 
 #### Making gene-to-genome mapping file
 ```bash
-output_csv="test_g2g_vcontact.csv"
+output_csv="test_g2g_vcontact_00.csv"
 
-# Write the header row to the output file
+# Write the headers row to output file
 echo "protein_id,contig_id,keywords" > "$output_csv"
 
 # Loop through each sample directory
@@ -285,22 +285,29 @@ for sample_dir in ./*/; do
     # Extract the sample name from the directory path
     sample_name=$(basename "$sample_dir")
 
-    # Path to the target .tsv file
+    # Path to the geNomad provirus genes .tsv file
     genes_file="${sample_dir}final.contigs_find_proviruses/final.contigs_provirus_genes.tsv"
 
-    # Check if the file exists before processing
+    # Check if the file exists
     if [[ -f "$genes_file" ]]; then
         echo "Processing $genes_file..."
 
-        # Extract the required columns and append to the output file
-        awk -F'\t' -v sample="$sample_name" 'NR > 1 { 
-            protein_id = sample "_" $1;  # Full protein ID with sample name
-            contig_id = $1;  # Original contig information from the "gene" column
-            keywords = $20;  # Annotation description
+        # Extract the required columns and modify contig_id
+        awk -F'\t' -v sample="$sample_name" 'NR > 1 {
+            # Full protein ID with sample name
+            protein_id = sample "_" $1;
+
+            # Contig ID is the protein ID without sample name and trailing _# 
+            contig_id = $1;  
+            sub(/_[0-9]+$/, "", contig_id)  # Remove the final underscore + number
+
+            # Annotation description (protein function info)
+            keywords = $20;  
             print protein_id "," contig_id "," keywords 
         }' "$genes_file" >> "$output_csv"
     else
         echo "Warning: File not found in $genes_file"
     fi
 done
+
 ```
