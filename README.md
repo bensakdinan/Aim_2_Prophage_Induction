@@ -303,7 +303,7 @@ for sample_dir in ./*/; do
 
             # Annotation description (protein function info)
             keywords = $20;  
-            print protein_id "," contig_id "," keywords 
+            print protein_id "," contig_id ",(" keywords ")"
         }' "$genes_file" >> "$output_csv"
     else
         echo "Warning: File not found in $genes_file"
