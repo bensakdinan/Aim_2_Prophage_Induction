@@ -273,6 +273,24 @@ awk -v metagenome="${metagenome}" 'BEGIN { OFS="\t" } NR > 1 { print metagenome,
 
 ## VContact2: Clustering by proteins
 
+#### 
+```bash
+# Get .faa protein files from geNomad outputs and concatenate into a single .faa file
+# geNomad outputs at /home/bens/projects/ctb-shapiro/bens/prophage_induction/03_genomad/${SAMPLE}
+for sample_dir in "/home/bens/projects/ctb-shapiro/bens/prophage_induction/03_genomad"/*/; do
+    protein_file="${sample_dir}final.contigs_find_proviruses/final.contigs_provirus_proteins.faa"
+
+    if [[ -f "$protein_file" ]]; then
+        cat "$protein_file" >> "all_unique_proteins.faa"
+    else
+        echo "Warning: File not found - $protein_file"
+    fi
+done
+
+# Remove trailing strings from protein identifier lines
+awk '{if ($0 ~ /^>/) {print $1} else {print $0}}' all_unique_proteins.faa > concatenated_prophage_proteins.faa
+```
+
 #### Making gene-to-genome mapping file
 ```bash
 output_csv="test_g2g_vcontact_00.csv"
@@ -302,8 +320,10 @@ for sample_dir in ./*/; do
             sub(/_[0-9]+$/, "", contig_id)  # Remove the final underscore + number
 
             # Annotation description (protein function info)
-            keywords = $20;  
-            print protein_id "," contig_id ",(" keywords ")"
+            split($20, keywords, ",")
+            first_keyword = keywords[1];
+
+            print protein_id "," contig_id "," first_keyword
         }' "$genes_file" >> "$output_csv"
     else
         echo "Warning: File not found in $genes_file"
