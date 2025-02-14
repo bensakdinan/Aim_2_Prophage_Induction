@@ -370,3 +370,21 @@ vcontact2 --raw-proteins $input_protein_file --proteins-fp $input_gene_to_genome
 
 deactivate
 ```
+
+### Analyze vConTACT2 output
+
+```bash
+# Map each contig to its original sample
+
+echo "contig,Sample" > "sample_by_contig.csv"
+
+for sample_dir in */; docd ./
+    sample_name="${sample_dir%/}"  # Remove trailing slash to get sample name
+    fasta_file="${sample_dir}final.contigs_find_proviruses/final.contigs_provirus.fna"
+
+    if [[ -f "$fasta_file" ]]; then
+        # Extract contig names and write to CSV
+        grep "^>" "$fasta_file" | sed 's/^>//' | awk -v sample="$sample_name" '{print $1 "," sample}' >> "sample_by_contig.csv"
+    fi
+done
+```
