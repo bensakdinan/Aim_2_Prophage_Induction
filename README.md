@@ -391,13 +391,13 @@ done
 ```
 
 #### Import libraries
-```{r}
+```r
 library(dplyr)
 library(ggplot2)
 ```
 
 #### Filter the dataset to only keep my contigs, not the reference DB contigs
-```{r}
+```r
 filtered_genome_by_genome <- genome_by_genome_overview %>% 
   filter(grepl("^k", Genome))
 
@@ -416,7 +416,7 @@ nrow(clustered_genome_by_genome) / nrow(filtered_genome_by_genome)
 - 2941/4055 (72.53%) of contigs are clustered (not singletons or outliers)
 
 #### Distribution of cluster sizes
-```{r}
+```r
 # How many unique clusters exist
 clusters <- unique(clustered_genome_by_genome$VC)
 length(clusters)
@@ -448,7 +448,7 @@ sum(vclusters$`VC Size` == 3)
 ```
 
 #### Per cluster, how many distinct samples are present 
-```{r}
+```r
 # Adding sample ID and Dehydration_Status per contig
 samples_in_vclusters <- sample_by_contig %>%
   left_join(X00_metadata %>%
