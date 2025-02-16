@@ -442,9 +442,14 @@ ggplot(vclusters, aes(x = VC, y = `VC Size`)) +
 # How many are doublets or triplets
 print("Number of doublets")
 sum(vclusters$`VC Size` == 2)
-
 print("Number of triplets")
 sum(vclusters$`VC Size` == 3)
+print("Number of doublets")
+sum(vclusters$`VC Size` == 4)
+print("Number of triplets")
+sum(vclusters$`VC Size` == 5)
+print("Number of triplets")
+sum(vclusters$`VC Size` > 5)
 ```
 
 #### Per cluster, how many distinct samples are present 
@@ -476,5 +481,51 @@ VC_vs_numSamples <- samples_in_vclusters %>%
     Severe = sum(Dehydration_Status == 3, na.rm = TRUE)
   ) %>% 
   ungroup()
+
+VC_vs_numSamples <- merge(VC_vs_numSamples, vclusters, by = 'VC')
+
+# unstratified_clusters <- sum(rowSums(VC_vs_numSamples[, c("Mild", "Moderate", "Severe")] > 0) == 1)
+# print(unstratified_clusters)
 ```
+
+#### What is the distrubution of cluster sizes among these 292 stratified clusters
+
+```r
+multi_category_VCs <- VC_vs_numSamples[rowSums(VC_vs_numSamples[, c("Mild", "Moderate", "Severe")] > 0) > 1, ]
+nrow(multi_category_VCs)
+
+# Plot histogram of cluster size distribution
+# Get each unique VC and its VC size
+stratified_clusters <- multi_category_VCs %>%
+  select(VC, `VC Size`) %>%
+  distinct()
+
+# Plot histogram by largest > smallest
+stratified_clusters <- stratified_clusters %>%
+  arrange(desc(`VC Size`))
+
+stratified_clusters$VC <- factor(stratified_clusters$VC, levels =
+                                   stratified_clusters$VC)
+
+# Plot 
+ggplot(stratified_clusters, aes(x = VC, y = `VC Size`)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  theme_minimal() +
+  labs(title = "Distribution of VCs by VC Size", x = "VC", y = "VC Size") +
+  theme(axis.text.x = element_blank())
+
+# Distrbution of cluster sizes
+print("Number of doublets")
+sum(stratified_clusters$`VC Size` == 2)
+print("Number of triplets")
+sum(stratified_clusters$`VC Size` == 3)
+print("Number of quartets")
+sum(stratified_clusters$`VC Size` == 4)
+print("Number of quintets")
+sum(stratified_clusters$`VC Size` == 5)
+print("Number of clusters >6")
+sum(stratified_clusters$`VC Size` > 5)
+```
+![image](https://github.com/user-attachments/assets/a9a859a4-72ee-48bc-85ea-bc905d3c1cb5)
+
 
