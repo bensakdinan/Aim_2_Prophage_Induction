@@ -1,4 +1,4 @@
-# Aim_1_Prophage_Induction
+# Aim_2_Prophage_Induction
 This markdown contains my step by step bioinformatic protocol
 
 ## Dataset
