@@ -528,4 +528,36 @@ sum(stratified_clusters$`VC Size` > 5)
 ```
 ![image](https://github.com/user-attachments/assets/a9a859a4-72ee-48bc-85ea-bc905d3c1cb5)
 
+#### Make the table (in bash), propagate_by_contigs. This table lists every contig, the origin sample, active/dormant status, and prophage-host_ratio
+```bash
+# Write header to new CSV file (liberal or conservative depending on propagate thresholds)
+echo "Sample,Genome,active,prophage-host_ratio" > "propagate_results_by_prophage_conservative.csv"
+
+# Loop over each subdirectory (assumes subdirectory names are your sample names)
+for sample_dir in */; do
+    # Remove the trailing slash to get the sample name
+    sample_name="${sample_dir%/}"
+    tsv_file="${sample_dir}${sample_name}.tsv"
+    
+    # Check if the file exists
+    if [[ -f "$tsv_file" ]]; then
+        header=$(head -n 1 "$tsv_file")
+        # Replace tabs with commas temporarily for easier parsing (optional)
+        header=$(echo "$header" | tr '\t' ',')
+        
+        # Find the column number for each column.
+        # Use awk with comma as separator.
+        prophage_col=$(echo "$header" | awk -F',' '{for(i=1;i<=NF;i++) if($i=="prophage") print i}')
+        active_col=$(echo "$header" | awk -F',' '{for(i=1;i<=NF;i++) if($i=="active") print i}')
+        ratio_col=$(echo "$header" | awk -F',' '{for(i=1;i<=NF;i++) if($i=="prophage-host_ratio") print i}')
+
+        # Now, process the file (skipping the header) and print desired columns with sample name.
+        tail -n +2 "$tsv_file" | awk -v s="$sample_name" -v pc="$prophage_col" -v ac="$active_col" -v rc="$ratio_col" 'BEGIN{FS="\t"; OFS=","} {print s, $pc, $ac, $rc}' >> "propagate_results_by_prophage_conservative.csv"
+    else
+        echo "File not found: $tsv_file" >&2
+    fi
+done
+
+```
+
 
